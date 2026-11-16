@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SKILL_CATEGORIES, type Skill } from "@/shared";
+import { CorePanel, PlanetPanel, type ExperienceRef, type ProjectRef } from "./PlanetPanel";
 
 /**
  * Full-page animated orrery. You are the sun; every skill is a planet,
@@ -14,6 +15,9 @@ import { SKILL_CATEGORIES, type Skill } from "@/shared";
  *   background tab never makes planets jump, and every fade is a smooth ramp (no popping).
  * - Cheap frames: textures, glows, the sun and the star field are painted once into
  *   offscreen canvases (on resize) and only blitted per frame. No shadowBlur.
+ * - Labels are real DOM buttons moved with translate3d (GPU-composited), not canvas text,
+ *   so they glide at sub-pixel precision without shimmering, and they are clickable,
+ *   focusable and readable by screen readers. Clicking one opens <PlanetPanel>.
  */
 
 type RGB = [number, number, number];
@@ -58,9 +62,86 @@ const TRAIL_STEP = 0.026; // rad between trail segments
 const BG_MARGIN = 30; // px of extra star field for pointer parallax
 const MAX_PIXELS = 4_500_000; // cap canvas backing store on huge / hi-dpi screens
 const NIGHT = "5, 7, 24";
+const SELECTED_TIME_SCALE = 0.12; // the system slows right down while a planet's details are open
 
-export function SolarSystem({ skills }: { skills: Skill[] }) {
+/** Kepler says ω ∝ r^-1.5; softened a little so outer planets still visibly move. */
+const orbitSpeed = (ring: number) => BASE_SPEED / Math.pow(1 + ring * 0.55, 1.25);
+
+type OrbitSkill = { skill: Skill; ring: number; index: number; count: number };
+
+/** Selection index meaning "the sun" (Core Frontend); planets use 0..n-1. */
+const SUN = -1;
+
+/**
+ * Core skills *are* the sun (Core Frontend). Every other category gets its own orbit,
+ * with planets ordered within each orbit.
+ */
+function orderSkills(skills: Skill[]) {
+  const core = skills.filter((s) => s.category === "core").sort((a, b) => a.orbitOrder - b.orbitOrder);
+  const rings = SKILL_CATEGORIES.filter((c) => c !== "core" && skills.some((s) => s.category === c));
+  const list: OrbitSkill[] = [];
+  rings.forEach((cat, ring) => {
+    const onRing = skills.filter((s) => s.category === cat).sort((a, b) => a.orbitOrder - b.orbitOrder);
+    onRing.forEach((skill, index) => list.push({ skill, ring, index, count: onRing.length }));
+  });
+  return { core, rings, list };
+}
+
+type Props = {
+  skills: Skill[];
+  projects?: ProjectRef[];
+  experience?: ExperienceRef[];
+};
+
+export function SolarSystem({ skills, projects = [], experience = [] }: Props) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const overlayRef = useRef<HTMLElement>(null);
+  const ordered = useMemo(() => orderSkills(skills), [skills]);
+  const [selected, setSelected] = useState<number | null>(null);
+  const selectedRef = useRef<number | null>(null);
+  const hoverRef = useRef<number | null>(null);
+  const renderRef = useRef<() => void>(() => {});
+
+  const hasSun = ordered.core.length > 0;
+  const current = selected !== null && selected >= 0 ? ordered.list[selected] : undefined;
+  const sunOpen = selected === SUN && hasSun;
+  // stepping order for Prev / Next: the sun first, then every planet
+  const sequence = useMemo(() => [...(hasSun ? [SUN] : []), ...ordered.list.map((_, i) => i)], [hasSun, ordered]);
+
+  useEffect(() => {
+    selectedRef.current = current || sunOpen ? selected : null;
+    renderRef.current();
+  }, [selected, current, sunOpen]);
+
+  const close = useCallback((restoreFocus: boolean) => {
+    setSelected((prev) => {
+      if (restoreFocus && prev !== null) {
+        const btn =
+          prev === SUN
+            ? overlayRef.current?.querySelector<HTMLButtonElement>("[data-sun]")
+            : overlayRef.current?.querySelectorAll<HTMLButtonElement>("[data-planet]")[prev];
+        if (btn && btn.tabIndex === 0) requestAnimationFrame(() => btn.focus({ preventScroll: true }));
+      }
+      return null;
+    });
+  }, []);
+
+  const step = useCallback(
+    (dir: 1 | -1) => {
+      const n = sequence.length;
+      setSelected((prev) => {
+        if (prev === null || n === 0) return prev;
+        const at = Math.max(0, sequence.indexOf(prev));
+        return sequence[(at + dir + n) % n] ?? prev;
+      });
+    },
+    [sequence],
+  );
+
+  const setHover = (i: number | null) => {
+    hoverRef.current = i;
+    renderRef.current();
+  };
 
   useEffect(() => {
     const canvas = ref.current;
@@ -69,31 +150,36 @@ export function SolarSystem({ skills }: { skills: Skill[] }) {
     const ctx: CanvasRenderingContext2D = maybeCtx;
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    // ---------- planets: one orbit per category that actually has skills ----------
-    const rings = SKILL_CATEGORIES.filter((c) => skills.some((s) => s.category === c));
-    const planets: Planet[] = [];
-    rings.forEach((cat, ring) => {
-      const onRing = skills.filter((s) => s.category === cat).sort((a, b) => a.orbitOrder - b.orbitOrder);
-      onRing.forEach((s, i) => {
-        const seed = hash(s.name);
-        const rnd = rng(seed);
-        const rgb = toRgb(s.color);
-        planets.push({
-          name: s.name,
-          rgb,
-          ring,
-          level: s.level,
-          phase: (i / onRing.length) * TAU + ring * 1.3,
-          // Kepler says ω ∝ r^-1.5; softened a little so outer planets still visibly move
-          speed: BASE_SPEED / Math.pow(1 + ring * 0.55, 1.25),
-          spin: 0.025 + rnd() * 0.05,
-          axial: (rnd() - 0.5) * 0.7,
-          ringed: ring > 0 && seed % 3 === 1,
-          seed,
-          halo: makeHalo(rgb),
-        });
-      });
+    // ---------- planets ----------
+    const rings = ordered.rings;
+    const planets: Planet[] = ordered.list.map(({ skill: s, ring, index, count }) => {
+      const seed = hash(s.name);
+      const rnd = rng(seed);
+      const rgb = toRgb(s.color);
+      return {
+        name: s.name,
+        rgb,
+        ring,
+        level: s.level,
+        phase: (index / count) * TAU + ring * 1.3,
+        speed: orbitSpeed(ring),
+        spin: 0.025 + rnd() * 0.05,
+        axial: (rnd() - 0.5) * 0.7,
+        ringed: ring > 0 && seed % 3 === 1,
+        seed,
+        halo: makeHalo(rgb),
+      };
     });
+
+    // ---------- DOM labels (rendered by React below, positioned here every frame) ----------
+    const labelEls = Array.from(overlayRef.current?.querySelectorAll<HTMLButtonElement>("[data-planet]") ?? []);
+    const labelText = labelEls.map((el) => el.querySelector<HTMLElement>("[data-label]"));
+    const labelHit = labelEls.map((el) => el.querySelector<HTMLElement>("[data-hit]"));
+    const labelState = labelEls.map(() => ({ op: -1, on: false, z: -1 }));
+    const sunEl = overlayRef.current?.querySelector<HTMLButtonElement>("[data-sun]") ?? null;
+    const sunText = sunEl?.querySelector<HTMLElement>("[data-label]") ?? null;
+    const sunHit = sunEl?.querySelector<HTMLElement>("[data-hit]") ?? null;
+    const sunState = { op: -1, on: false };
 
     // ---------- sprites that never change ----------
     const corona = makeCorona();
@@ -148,7 +234,7 @@ export function SolarSystem({ skills }: { skills: Skill[] }) {
         baseY: wide ? h * 0.5 : h * 0.3,
         focal: unit * 2.4,
         orbit: rings.map((_, i) => inner + gap * i * (1 + i * 0.04)),
-        sunR: inner * 0.34,
+        sunR: inner * 0.4,
         textEdge: wide ? w * 0.56 : -Infinity,
       };
 
@@ -159,7 +245,9 @@ export function SolarSystem({ skills }: { skills: Skill[] }) {
     };
 
     // ---------- simulation ----------
-    let sim = reduceMotion ? 40 : 0;
+    let sim = reduceMotion ? 40 : 0; // drives effects (twinkle, corona, shooting stars)
+    let orbitT = sim; // drives the planets; slows down while a planet is selected
+    let timeScale = 1;
     const pointer = { x: 0, y: 0, tx: 0, ty: 0 };
     let shoot: { x: number; y: number; vx: number; vy: number; age: number; life: number } | null = null;
     let nextShoot = 4;
@@ -191,17 +279,30 @@ export function SolarSystem({ skills }: { skills: Skill[] }) {
       ctx.stroke();
     }
 
-    function drawOrbits(front: boolean, fade: number) {
-      ctx.lineWidth = 1;
+    function drawOrbits(front: boolean, fade: number, selRing: number) {
       L!.orbit.forEach((radius, i) => {
         const a = (front ? 0.3 : 0.12) * (i === 0 ? 1.25 : 1);
         ctx.globalAlpha = fade;
-        ctx.strokeStyle = `rgba(150, 160, 235, ${a})`;
+        ctx.lineWidth = i === selRing ? 1.4 : 1;
+        ctx.strokeStyle = i === selRing ? `rgba(227, 184, 102, ${a * 1.8})` : `rgba(150, 160, 235, ${a})`;
         drawOrbitHalf(radius, front);
       });
     }
 
-    type Placed = { p: Planet; a: number; x: number; y: number; r: number; front: number };
+    type Placed = { i: number; p: Planet; a: number; x: number; y: number; r: number; front: number };
+
+    /** Marker around the selected (solid, pulsing) or hovered (dashed) planet. */
+    function drawMarker(o: Placed, alpha: number, selectedNow: boolean) {
+      const pr = o.r + 5 + (selectedNow ? Math.sin(sim * 3) * 1.2 : 0);
+      ctx.globalAlpha = alpha * (selectedNow ? 0.9 : 0.55);
+      ctx.strokeStyle = "rgb(227, 184, 102)";
+      ctx.lineWidth = 1.5;
+      if (!selectedNow) ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.arc(o.x, o.y, pr, 0, TAU);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
 
     function drawRing(o: Placed, front: boolean, alpha: number) {
       const { r, p } = o;
@@ -268,7 +369,7 @@ export function SolarSystem({ skills }: { skills: Skill[] }) {
         ctx.translate(x, y);
         ctx.rotate(ROLL + p.axial);
         const span = 4 * r;
-        const off = (((sim * p.spin * span) % span) + span) % span;
+        const off = (((orbitT * p.spin * span) % span) + span) % span;
         ctx.drawImage(p.tex, -r - off, -r, span, 2 * r);
         ctx.drawImage(p.tex, -r - off + span, -r, span, 2 * r);
         ctx.restore();
@@ -306,6 +407,8 @@ export function SolarSystem({ skills }: { skills: Skill[] }) {
       ctx.globalCompositeOperation = "source-over";
 
       if (p.ringed) drawRing(o, true, alpha);
+      if (o.i === selectedRef.current) drawMarker(o, alpha, true);
+      else if (o.i === hoverRef.current) drawMarker(o, alpha, false);
     }
 
     function drawSun(fade: number) {
@@ -342,24 +445,85 @@ export function SolarSystem({ skills }: { skills: Skill[] }) {
       const ir = sunR * 1.9;
       ctx.drawImage(corona, cx - ir, cy - ir, ir * 2, ir * 2);
       ctx.globalCompositeOperation = "source-over";
+
+      // marker when the sun (Core Frontend) is selected or hovered
+      const sel = selectedRef.current === SUN;
+      if (sel || hoverRef.current === SUN) {
+        ctx.globalAlpha = fade * (sel ? 0.85 : 0.5);
+        ctx.strokeStyle = "rgb(227, 184, 102)";
+        ctx.lineWidth = 1.5;
+        if (!sel) ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.arc(cx, cy, sunR + 9 + (sel ? Math.sin(sim * 3) * 1.5 : 0), 0, TAU);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
     }
 
-    function drawLabels(placed: Placed[], fade: number) {
-      ctx.textBaseline = "middle";
-      ctx.lineJoin = "round";
+    /** Position the "Core Frontend" button on the sun. */
+    function updateSunLabel(fade: number) {
+      if (!sunEl || !sunText) return;
+      const scrollVis = smooth(0.62, 0.9, fade);
+      const tf = textFade(cx);
+      const sunR = L!.sunR;
+      sunEl.style.transform = `translate3d(${cx.toFixed(2)}px, ${cy.toFixed(2)}px, 0)`;
+      sunText.style.transform = `translate3d(-50%, ${(sunR + 12).toFixed(2)}px, 0)`;
+      if (sunHit) sunHit.style.transform = `scale(${Math.max(1, (sunR + 6) / 20).toFixed(3)})`;
+      const op = Math.round(scrollVis * tf * 100) / 100;
+      if (op !== sunState.op) {
+        sunText.style.opacity = String(op);
+        sunState.op = op;
+      }
+      const on = scrollVis > 0.5 && tf > 0.5;
+      if (on !== sunState.on) {
+        sunEl.style.pointerEvents = on ? "auto" : "none";
+        sunEl.tabIndex = on ? 0 : -1;
+        sunEl.setAttribute("aria-hidden", on ? "false" : "true");
+        sunState.on = on;
+      }
+    }
+
+    /**
+     * Position the DOM label buttons. Only transforms change per frame (compositor-only),
+     * opacity / interactivity are written only when they actually change.
+     */
+    function updateLabels(placed: Placed[], fade: number) {
+      // labels live above the page content, so they bow out once you scroll past the hero
+      const scrollVis = smooth(0.62, 0.9, fade);
       for (const o of placed) {
+        const el = labelEls[o.i];
+        const text = labelText[o.i];
+        const st = labelState[o.i];
+        if (!el || !text || !st) continue;
+        const tf = textFade(o.x);
         const depthVis = L!.wide ? 0.45 + 0.55 * smooth(0.1, 0.6, o.front) : smooth(0.35, 0.7, o.front);
         const dist = Math.hypot(o.x - cx, o.y - cy);
         const sunVis = o.front < 0.5 ? smooth(L!.sunR * 0.9, L!.sunR * 1.7, dist) : 1;
-        const a = fade * textFade(o.x) * depthVis * sunVis * 0.92;
-        if (a < 0.02) continue;
-        ctx.font = `500 ${o.p.ring === 0 ? 12.5 : 11.5}px "IBM Plex Sans", system-ui, sans-serif`;
-        ctx.globalAlpha = a;
-        ctx.strokeStyle = "rgba(10, 13, 36, 0.75)";
-        ctx.lineWidth = 3;
-        ctx.strokeText(o.p.name, o.x + o.r + 7, o.y);
-        ctx.fillStyle = "#ece8dc";
-        ctx.fillText(o.p.name, o.x + o.r + 7, o.y);
+        let a = scrollVis * tf * depthVis * sunVis;
+        if (o.i === selectedRef.current || o.i === hoverRef.current) a = Math.max(a, scrollVis * tf * sunVis);
+
+        el.style.transform = `translate3d(${o.x.toFixed(2)}px, ${o.y.toFixed(2)}px, 0)`;
+        text.style.transform = `translate3d(${(o.r + 8).toFixed(2)}px, -50%, 0)`;
+        // tap target hugs the planet (40px base, scaled), and nearer planets win overlaps
+        const hit = labelHit[o.i];
+        if (hit) hit.style.transform = `scale(${Math.min(1.1, Math.max(0.6, (o.r + 9) / 20)).toFixed(3)})`;
+        const z = Math.round(o.front * 100);
+        if (z !== st.z) {
+          el.style.zIndex = String(z);
+          st.z = z;
+        }
+        const op = Math.round(a * 100) / 100;
+        if (op !== st.op) {
+          text.style.opacity = String(op);
+          st.op = op;
+        }
+        const on = scrollVis > 0.5 && tf > 0.5 && sunVis > 0.5;
+        if (on !== st.on) {
+          el.style.pointerEvents = on ? "auto" : "none";
+          el.tabIndex = on ? 0 : -1;
+          el.setAttribute("aria-hidden", on ? "false" : "true");
+          st.on = on;
+        }
       }
     }
 
@@ -436,22 +600,29 @@ export function SolarSystem({ skills }: { skills: Skill[] }) {
       cy = L.baseY + pointer.y * 7;
 
       const placed: Placed[] = planets
-        .map((p) => {
-          const a = p.phase + sim * p.speed;
+        .map((p, i) => {
+          const a = p.phase + orbitT * p.speed;
           const R = L!.orbit[p.ring] ?? 0;
           project(Math.cos(a) * R, Math.sin(a) * R);
-          return { p, a, x: P.x, y: P.y, r: planetRadius(p) * P.s, front: (Math.sin(a) + 1) / 2 };
+          return { i, p, a, x: P.x, y: P.y, r: planetRadius(p) * P.s, front: (Math.sin(a) + 1) / 2 };
         })
         .sort((A, B) => A.front - B.front);
 
-      drawOrbits(false, fade);
+      const sel = selectedRef.current;
+      const selRing = sel !== null && sel >= 0 ? (planets[sel]?.ring ?? -1) : -1;
+      drawOrbits(false, fade, selRing);
       for (const o of placed) if (o.front < 0.5) drawPlanet(o, fade);
       drawSun(fade);
-      drawOrbits(true, fade);
+      drawOrbits(true, fade, selRing);
       for (const o of placed) if (o.front >= 0.5) drawPlanet(o, fade);
-      drawLabels(placed, fade);
+      updateLabels(placed, fade);
+      updateSunLabel(fade);
       ctx.globalAlpha = 1;
     }
+    // lets React (selection / hover changes) request a repaint, e.g. in reduced-motion mode
+    renderRef.current = () => {
+      if (reduceMotion) render();
+    };
 
     // ---------- loop ----------
     let raf = 0;
@@ -460,6 +631,9 @@ export function SolarSystem({ skills }: { skills: Skill[] }) {
       const dt = Math.min(Math.max((now - last) / 1000, 0), 1 / 20); // clamp: no jumps after a stall
       last = now;
       sim += dt;
+      const targetScale = selectedRef.current !== null ? SELECTED_TIME_SCALE : 1;
+      timeScale += (targetScale - timeScale) * (1 - Math.exp(-dt * 3));
+      orbitT += dt * timeScale;
       const k = 1 - Math.exp(-dt * 2.5); // frame-rate independent easing
       pointer.x += (pointer.tx - pointer.x) * k;
       pointer.y += (pointer.ty - pointer.y) * k;
@@ -497,11 +671,112 @@ export function SolarSystem({ skills }: { skills: Skill[] }) {
       observer.disconnect();
       window.removeEventListener("pointermove", onPointer);
       window.removeEventListener("scroll", onScroll);
+      renderRef.current = () => {};
     };
-  }, [skills]);
+  }, [ordered]);
 
-  // h-lvh: sized to the *large* viewport so the mobile address bar showing/hiding never resizes it
-  return <canvas ref={ref} aria-hidden className="pointer-events-none fixed left-0 top-0 -z-10 h-lvh w-full" />;
+  return (
+    <>
+      {/* h-lvh: sized to the *large* viewport so the mobile address bar showing/hiding never resizes it */}
+      <canvas ref={ref} aria-hidden className="pointer-events-none fixed left-0 top-0 -z-10 h-lvh w-full" />
+
+      {/* Clickable planet labels. Positioned every frame by the animation loop above. */}
+      <nav
+        ref={overlayRef}
+        aria-label="Technologies — select a planet for details"
+        className="pointer-events-none fixed left-0 top-0 z-[5] h-lvh w-full overflow-hidden"
+      >
+        {hasSun && (
+          <button
+            type="button"
+            data-sun
+            tabIndex={-1}
+            aria-label="Core Frontend: show details"
+            aria-expanded={sunOpen}
+            onClick={() => setSelected((s) => (s === SUN ? null : SUN))}
+            onPointerEnter={() => setHover(SUN)}
+            onPointerLeave={() => hoverRef.current === SUN && setHover(null)}
+            onFocus={() => setHover(SUN)}
+            onBlur={() => hoverRef.current === SUN && setHover(null)}
+            style={{ pointerEvents: "none", transform: "translate3d(-200px, -200px, 0)" }}
+            className="group absolute left-0 top-0 size-0 cursor-pointer outline-none will-change-transform"
+          >
+            <span
+              data-hit
+              aria-hidden
+              className="absolute -left-5 -top-5 size-10 rounded-full will-change-transform group-focus-visible:shadow-[0_0_0_2px_#e3b866]"
+            />
+            <span
+              data-label
+              aria-hidden
+              style={{ opacity: 0 }}
+              className="absolute left-0 top-0 whitespace-nowrap text-[11px] font-semibold uppercase leading-none tracking-[0.18em] text-brass will-change-transform [text-shadow:0_1px_2px_rgba(10,13,36,0.95),0_0_12px_rgba(10,13,36,0.9)] group-hover:text-[#f5d595]"
+            >
+              Core Frontend
+            </span>
+          </button>
+        )}
+        {ordered.list.map(({ skill, ring }, i) => (
+          <button
+            key={skill.id}
+            type="button"
+            data-planet
+            tabIndex={-1}
+            aria-label={`${skill.name}: show details`}
+            aria-expanded={selected === i}
+            onClick={() => setSelected((s) => (s === i ? null : i))}
+            onPointerEnter={() => setHover(i)}
+            onPointerLeave={() => hoverRef.current === i && setHover(null)}
+            onFocus={() => setHover(i)}
+            onBlur={() => hoverRef.current === i && setHover(null)}
+            style={{ pointerEvents: "none", transform: "translate3d(-200px, -200px, 0)" }}
+            className="group absolute left-0 top-0 size-0 cursor-pointer outline-none will-change-transform"
+          >
+            {/* generous hit area centred on the planet */}
+            <span
+              data-hit
+              aria-hidden
+              className="absolute -left-5 -top-5 size-10 rounded-full will-change-transform group-focus-visible:shadow-[0_0_0_2px_#e3b866]"
+            />
+            <span
+              data-label
+              aria-hidden
+              style={{ opacity: 0 }}
+              className={`absolute left-0 top-0 whitespace-nowrap font-medium leading-none text-star transition-colors will-change-transform [text-shadow:0_1px_2px_rgba(10,13,36,0.95),0_0_10px_rgba(10,13,36,0.85)] group-hover:text-brass group-aria-expanded:text-brass ${
+                ring === 0 ? "text-[12.5px]" : "text-[11.5px]"
+              }`}
+            >
+              {skill.name}
+            </span>
+          </button>
+        ))}
+      </nav>
+
+      {current && selected !== null && (
+        <PlanetPanel
+          skill={current.skill}
+          orbit={current.ring + 1}
+          period={TAU / orbitSpeed(current.ring)}
+          position={sequence.indexOf(selected) + 1}
+          total={sequence.length}
+          projects={projects}
+          experience={experience}
+          onClose={close}
+          onStep={step}
+        />
+      )}
+      {sunOpen && (
+        <CorePanel
+          skills={ordered.core}
+          position={1}
+          total={sequence.length}
+          projects={projects}
+          onClose={close}
+          onStep={step}
+        />
+      )}
+    </>
+  );
 }
 
 /* ====================================================================== */

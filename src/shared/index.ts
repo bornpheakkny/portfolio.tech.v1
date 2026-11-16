@@ -46,6 +46,13 @@ export type SkillInput = z.infer<typeof skillSchema>;
 export type Skill = SkillInput & { id: string };
 
 // ---------- Projects ----------
+/** One source repository of a project. A project can have several (e.g. portfolio, CMS, API). */
+export const repoLinkSchema = z.object({
+  label: z.string().trim().min(1, "Give the repo a label, e.g. API"),
+  url: z.url("Must be a full URL, e.g. https://github.com/you/repo"),
+});
+export type RepoLink = z.infer<typeof repoLinkSchema>;
+
 export const projectSchema = z.object({
   title: z.string().min(1),
   slug: z
@@ -58,7 +65,7 @@ export const projectSchema = z.object({
   gallery: z.array(z.url()).default([]),
   techStack: z.array(z.string()).default([]),
   liveUrl: optionalUrl,
-  repoUrl: optionalUrl,
+  repos: z.array(repoLinkSchema).default([]),
   featured: z.boolean().default(false),
   published: z.boolean().default(false),
   order: z.number().int().default(0),

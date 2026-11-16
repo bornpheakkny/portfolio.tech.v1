@@ -6,15 +6,7 @@ import { cld, monthYear } from "@/lib/format";
 import { SolarSystem } from "@/components/SolarSystem";
 import { Header } from "@/components/Header";
 import { ContactForm } from "@/components/ContactForm";
-
-const ORBIT_NAMES: Record<SkillCategory, string> = {
-  core: "Core technologies",
-  framework: "Frameworks",
-  styling: "Styling",
-  testing: "Testing",
-  tooling: "Tooling",
-  backend: "Backend",
-};
+import { ORBIT_NAMES } from "@/lib/tech-info";
 
 export default async function Home() {
   const { profile, skills, projects, experience, education } = await getPortfolio();
@@ -27,7 +19,11 @@ export default async function Home() {
 
   return (
     <>
-      <SolarSystem skills={skills} />
+      <SolarSystem
+        skills={skills}
+        projects={projects.map(({ slug, title, techStack }) => ({ slug, title, techStack }))}
+        experience={experience.map(({ id, role, company, techStack }) => ({ id, role, company, techStack }))}
+      />
       <Header name={name} hasProjects={projects.length > 0} />
 
       <main>
@@ -62,13 +58,15 @@ export default async function Home() {
           <div className="mx-auto max-w-6xl px-6 py-24">
             <h2 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Stack</h2>
             <p className="mt-3 max-w-xl text-muted">
-              The inner orbit is what I use every day. Each ring further out is a layer of the stack around it.
+              The sun is my core frontend, what I use every day. Each orbit further out is a layer of the stack around it.
             </p>
             <div className="mt-12 grid gap-x-12 gap-y-10 md:grid-cols-2">
-              {orbits.map(({ cat, items }, i) => (
+              {orbits.map(({ cat, items }) => (
                 <div key={cat}>
                   <h3 className="flex items-baseline gap-3 text-lg font-semibold">
-                    <span className="text-sm font-normal text-muted">Orbit {i + 1}</span>
+                    <span className="text-sm font-normal text-muted">
+                      {cat === "core" ? "The sun" : `Orbit ${orbits.filter((o) => o.cat !== "core").findIndex((o) => o.cat === cat) + 1}`}
+                    </span>
                     {ORBIT_NAMES[cat]}
                   </h3>
                   <ul className="mt-4 space-y-3">
