@@ -13,7 +13,7 @@ export const fallbackData: PortfolioData = {
     resumeUrl: null,
     socials: {
       linkedin: "https://www.linkedin.com/in/pheakkorny-born-15259b249",
-      github: "https://github.com/Pheakkorny",
+      github: "https://github.com/bornpheakkny",
     },
     updatedAt: new Date(0).toISOString(),
   },
