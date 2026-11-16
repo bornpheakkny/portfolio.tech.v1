@@ -3,7 +3,7 @@
 My personal portfolio: a solar-system themed site where I'm the sun and every technology I work with is a planet, one orbit per category.
 
 **Stack:** Next.js 16 · React 19 · Tailwind 4 · canvas orrery — deployed on **Vercel**.
-Content comes from [portfolio-cms.api.v1](https://github.com/Pheakkorny/portfolio-cms.api.v1) and is edited in [cms.v1](https://github.com/Pheakkorny/cms.v1).
+Content comes from [portfolio-cms.api.v1](https://github.com/bornpheakkny/portfolio-cms.api.v1) and is edited in [cms.v1](https://github.com/bornpheakkny/cms.v1).
 
 ## Run locally
 ```bash
