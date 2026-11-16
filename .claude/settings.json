@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(git config --show-origin --get-all credential.helper)",
+      "PowerShell(git config user.name)",
+      "PowerShell(git config user.email)",
+      "PowerShell(gh auth status)",
+      "PowerShell(git ls-remote origin)"
+    ]
+  }
+}
