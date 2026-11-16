@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+@theme {
+  --color-void: #0a0d24;
+  --color-panel: #12163a;
+  --color-panel-2: #1a1f4a;
+  --color-brass: #e3b866;
+  --color-brass-deep: #b98a3e;
+  --color-star: #ece8dc;
+  --color-muted: #9a9cbc;
+  --color-orbit: #3a3f74;
+  --font-display: "Unbounded Variable", "Unbounded", system-ui, sans-serif;
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 5rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+body {
+  background:
+    radial-gradient(60rem 40rem at 70% 40%, #1b1f55 0%, transparent 60%),
+    radial-gradient(40rem 30rem at 10% 90%, #2a1640 0%, transparent 60%),
+    var(--color-void);
+  background-attachment: fixed;
+  color: var(--color-star);
+  font-family: var(--font-sans);
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-brass);
+  color: var(--color-void);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brass);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+/* Content panels sit over the orrery but let it glow through */
+.panel {
+  background: color-mix(in oklab, var(--color-void) 78%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* The one orchestrated motion: hero lines rise in on load */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.rise {
+  animation: rise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rise {
+    animation: none;
+  }
+}
