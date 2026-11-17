@@ -1,0 +1,122 @@
+/* ---------- covers ---------- */
+.cover {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: 1.5rem;
+  border: 1px solid var(--color-orbit);
+  background: var(--color-panel);
+}
+
+.coverSmall {
+  composes: cover;
+  aspect-ratio: 4 / 3;
+  border-radius: 1rem;
+}
+
+.image {
+  object-fit: cover;
+  transition: transform 700ms var(--ease);
+}
+
+.placeholder {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: radial-gradient(circle at 30% 30%, #2a2f6b, var(--color-panel) 70%);
+}
+
+.placeholderTitle {
+  font-family: var(--font-display);
+  text-align: center;
+  font-size: 1.5rem;
+  line-height: 2rem;
+  font-weight: 600;
+  color: color-mix(in oklab, var(--color-star) 70%, transparent);
+}
+
+/* ---------- featured project ---------- */
+.featured {
+  margin-top: 3rem;
+  display: grid;
+  align-items: center;
+  gap: 2rem;
+}
+@media (min-width: 64rem) {
+  .featured {
+    grid-template-columns: 1.3fr 1fr;
+  }
+}
+
+.featuredTitle {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  line-height: 2rem;
+  font-weight: 600;
+  transition: color var(--duration-hover) var(--ease-out);
+}
+
+.summary {
+  margin-top: 0.75rem;
+  color: var(--color-muted);
+}
+
+.tech {
+  margin-top: 1.25rem;
+}
+
+/* ---------- the rest ---------- */
+.grid {
+  margin-top: 4rem;
+  display: grid;
+  gap: 2.5rem;
+}
+@media (min-width: 40rem) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 64rem) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.card {
+  display: block;
+}
+
+.cardTitle {
+  margin-top: 1rem;
+  font-weight: 600;
+  transition: color var(--duration-hover) var(--ease-out);
+}
+
+.cardSummary {
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: var(--color-muted);
+}
+
+/* ---------- hover / focus: title warms to brass, cover zooms ---------- */
+.featured:focus-visible .featuredTitle,
+.card:focus-visible .cardTitle {
+  color: var(--color-brass);
+}
+.featured:focus-visible .image,
+.card:focus-visible .image {
+  transform: scale(1.03);
+}
+@media (hover: hover) {
+  .featured:hover .featuredTitle,
+  .card:hover .cardTitle {
+    color: var(--color-brass);
+  }
+  .featured:hover .image,
+  .card:hover .image {
+    transform: scale(1.03);
+  }
+}

@@ -3,7 +3,7 @@ import "@fontsource-variable/unbounded";
 import "@fontsource/ibm-plex-sans/400.css";
 import "@fontsource/ibm-plex-sans/500.css";
 import "@fontsource/ibm-plex-sans/600.css";
-import "./globals.css";
+import "@/styles/globals.css";
 import { getPortfolio } from "@/lib/api";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";

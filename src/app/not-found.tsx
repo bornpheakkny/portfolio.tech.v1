@@ -1,11 +1,14 @@
 import Link from "next/link";
+import { cx } from "@/lib/cx";
+import button from "@/components/ui/button.module.css";
+import styles from "./not-found.module.css";
 
 export default function NotFound() {
   return (
-    <main className="flex min-h-svh flex-col items-center justify-center px-6 text-center">
-      <h1 className="font-display text-4xl font-semibold">Lost in space</h1>
-      <p className="mt-3 text-muted">This page drifted out of orbit.</p>
-      <Link href="/" className="mt-8 rounded-full bg-brass px-6 py-3 font-medium text-void">
+    <main className={styles.main}>
+      <h1 className={styles.title}>Lost in space</h1>
+      <p className={styles.text}>This page drifted out of orbit.</p>
+      <Link href="/" className={cx(button.primary, styles.cta)}>
         Back home
       </Link>
     </main>

@@ -1,0 +1,20 @@
+.inner {
+  display: grid;
+  gap: 3rem;
+}
+@media (min-width: 64rem) {
+  .inner {
+    grid-template-columns: 1fr 1.3fr;
+  }
+}
+
+.intro {
+  margin-top: 1rem;
+  max-width: 24rem;
+  color: var(--color-muted);
+}
+
+.email {
+  margin-top: 1.5rem;
+  display: inline-block;
+}

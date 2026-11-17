@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useEffect, useRef, type ReactNode } from "react";
 import type { Skill } from "@/shared";
-import { CATEGORY_BLURB, ORBIT_NAMES, levelWord, sameTech, techInfo } from "@/lib/tech-info";
+import link from "@/components/ui/link.module.css";
+import { CATEGORY_BLURB, ORBIT_NAMES, levelWord, sameTech, techInfo } from "./tech-info";
+import styles from "./PlanetPanel.module.css";
 
 export type ProjectRef = { slug: string; title: string; techStack: string[] };
 export type ExperienceRef = { id: string; role: string; company: string; techStack: string[] };
@@ -44,9 +46,9 @@ export function PlanetPanel({
       title={skill.name}
       footer={
         <>
-          <span className="text-muted">Orbital period {Math.round(period)} s</span>
+          <span className={styles.muted}>Orbital period {Math.round(period)} s</span>
           {info?.url && (
-            <a href={info.url} target="_blank" rel="noreferrer" className="text-brass underline-offset-4 hover:underline">
+            <a href={info.url} target="_blank" rel="noreferrer" className={link.text}>
               Official site ↗
             </a>
           )}
@@ -55,13 +57,13 @@ export function PlanetPanel({
     >
       <LevelBar level={skill.level} color={skill.color} />
 
-      <p className="mt-6 text-[0.95rem] leading-relaxed text-star/90">{description}</p>
+      <p className={styles.descriptionSpaced}>{description}</p>
 
       {info && info.highlights.length > 0 && (
-        <ul className="mt-5 space-y-2">
+        <ul className={styles.highlights}>
           {info.highlights.map((h) => (
-            <li key={h} className="flex gap-3 text-sm text-star/80">
-              <span aria-hidden className="mt-[0.55rem] size-1.5 shrink-0 rounded-full" style={{ background: skill.color }} />
+            <li key={h} className={styles.highlight}>
+              <span aria-hidden className={styles.bullet} style={{ background: skill.color }} />
               {h}
             </li>
           ))}
@@ -69,19 +71,19 @@ export function PlanetPanel({
       )}
 
       {(usedIn.length > 0 || roles.length > 0) && (
-        <div className="mt-6 border-t border-orbit/60 pt-5">
-          <h3 className="text-xs uppercase tracking-[0.14em] text-muted">Where I&apos;ve used it</h3>
-          <ul className="mt-3 space-y-2 text-sm">
+        <div className={styles.related}>
+          <h3 className={styles.relatedTitle}>Where I&apos;ve used it</h3>
+          <ul className={styles.relatedList}>
             {usedIn.map((p) => (
               <li key={p.slug}>
-                <Link href={`/projects/${p.slug}`} className="text-brass underline-offset-4 hover:underline">
+                <Link href={`/projects/${p.slug}`} className={link.text}>
                   {p.title}
                 </Link>
               </li>
             ))}
             {roles.map((e) => (
-              <li key={e.id} className="text-star/85">
-                {e.role}, <span className="text-muted">{e.company}</span>
+              <li key={e.id} className={styles.roleItem}>
+                {e.role}, <span className={styles.muted}>{e.company}</span>
               </li>
             ))}
           </ul>
@@ -109,47 +111,47 @@ export function CorePanel({ skills, projects, ...nav }: Nav & { skills: Skill[];
       title="Core Frontend"
       footer={
         <>
-          <span className="text-muted">
+          <span className={styles.muted}>
             {skills.length} technologies · avg {avg}%
           </span>
-          <span className="text-muted">Everything else orbits these</span>
+          <span className={styles.muted}>Everything else orbits these</span>
         </>
       }
     >
-      <p className="text-[0.95rem] leading-relaxed text-star/90">
+      <p className={styles.description}>
         The foundation of everything I build: the languages and the UI library I use every day. Frameworks, styling, testing and
         backend tools are the orbits around them.
       </p>
 
-      <ul className="mt-6 space-y-5">
+      <ul className={styles.coreList}>
         {skills.map((s) => {
           const info = techInfo(s.name);
           const blurb = s.description.trim() || (info ? firstSentence(info.summary) : "");
           return (
             <li key={s.id}>
-              <div className="flex items-center gap-3">
-                <span aria-hidden className="size-2.5 shrink-0 rounded-full" style={{ background: s.color, boxShadow: `0 0 10px ${s.color}` }} />
-                <span className="font-medium text-star">{s.name}</span>
-                <span className="ml-auto text-xs text-muted">
+              <div className={styles.coreRow}>
+                <span aria-hidden className={styles.coreDot} style={{ background: s.color, boxShadow: `0 0 10px ${s.color}` }} />
+                <span className={styles.coreName}>{s.name}</span>
+                <span className={styles.coreLevel}>
                   {levelWord(s.level)} · {s.level}%
                 </span>
               </div>
-              <div className="ml-[1.375rem] mt-1.5 h-1 overflow-hidden rounded-full bg-orbit/60" role="img" aria-label={`${s.level} out of 100`}>
-                <div className="h-full rounded-full" style={{ width: `${s.level}%`, background: `linear-gradient(90deg, ${darkOf(s.color)}, ${s.color})` }} />
+              <div className={styles.coreTrack} role="img" aria-label={`${s.level} out of 100`}>
+                <div className={styles.fill} style={{ width: `${s.level}%`, background: `linear-gradient(90deg, ${darkOf(s.color)}, ${s.color})` }} />
               </div>
-              {blurb && <p className="ml-[1.375rem] mt-1.5 text-[0.85rem] leading-snug text-muted">{blurb}</p>}
+              {blurb && <p className={styles.coreBlurb}>{blurb}</p>}
             </li>
           );
         })}
       </ul>
 
       {usedIn.length > 0 && (
-        <div className="mt-6 border-t border-orbit/60 pt-5">
-          <h3 className="text-xs uppercase tracking-[0.14em] text-muted">Built with it</h3>
-          <ul className="mt-3 space-y-2 text-sm">
+        <div className={styles.related}>
+          <h3 className={styles.relatedTitle}>Built with it</h3>
+          <ul className={styles.relatedList}>
             {usedIn.map((p) => (
               <li key={p.slug}>
-                <Link href={`/projects/${p.slug}`} className="text-brass underline-offset-4 hover:underline">
+                <Link href={`/projects/${p.slug}`} className={link.text}>
                   {p.title}
                 </Link>
               </li>
@@ -168,14 +170,14 @@ export function CorePanel({ skills, projects, ...nav }: Nav & { skills: Skill[];
 function LevelBar({ level, color }: { level: number; color: string }) {
   return (
     <div>
-      <div className="flex items-baseline justify-between text-sm">
-        <span className="text-muted">Proficiency</span>
-        <span className="font-medium text-star">
+      <div className={styles.levelHead}>
+        <span className={styles.muted}>Proficiency</span>
+        <span className={styles.levelValue}>
           {levelWord(level)} · {level}%
         </span>
       </div>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-orbit/60" role="img" aria-label={`${level} out of 100`}>
-        <div className="h-full rounded-full" style={{ width: `${level}%`, background: `linear-gradient(90deg, ${darkOf(color)}, ${color})` }} />
+      <div className={styles.levelTrack} role="img" aria-label={`${level} out of 100`}>
+        <div className={styles.fill} style={{ width: `${level}%`, background: `linear-gradient(90deg, ${darkOf(color)}, ${color})` }} />
       </div>
     </div>
   );
@@ -237,14 +239,14 @@ function PanelShell({
         if (e.key === "ArrowRight") onStep(1);
         if (e.key === "ArrowLeft") onStep(-1);
       }}
-      className="fixed inset-x-3 bottom-3 z-50 max-h-[72svh] overflow-y-auto rounded-3xl border border-orbit/80 bg-void/85 p-6 shadow-[0_24px_70px_-20px_rgba(0,0,0,0.85)] backdrop-blur-xl sm:inset-x-auto sm:bottom-auto sm:right-6 sm:top-24 sm:max-h-[calc(100svh-8rem)] sm:w-[24rem]"
+      className={styles.dialog}
     >
-      <div key={id} className="panel-in">
-        <div className="flex items-start gap-4">
-          <span aria-hidden className="mt-0.5 size-12 shrink-0 rounded-full" style={orbStyle} />
-          <div className="min-w-0 flex-1">
-            <p className="text-xs uppercase tracking-[0.14em] text-muted">{eyebrow}</p>
-            <h2 id="planet-title" className="font-display mt-1 text-2xl font-semibold leading-tight text-star">
+      <div key={id} className={styles.content}>
+        <div className={styles.head}>
+          <span aria-hidden className={styles.orb} style={orbStyle} />
+          <div className={styles.titles}>
+            <p className={styles.eyebrow}>{eyebrow}</p>
+            <h2 id="planet-title" className={styles.title}>
               {title}
             </h2>
           </div>
@@ -253,34 +255,34 @@ function PanelShell({
             type="button"
             onClick={() => onClose(true)}
             aria-label="Close details"
-            className="-mr-2 -mt-2 rounded-full p-2 text-muted transition-colors hover:text-star"
+            className={styles.close}
           >
-            <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <svg viewBox="0 0 24 24" className={styles.closeIcon} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M6 6l12 12M18 6L6 18" />
             </svg>
           </button>
         </div>
 
-        <div className="mt-6">{children}</div>
+        <div className={styles.body}>{children}</div>
 
-        <div className="mt-6 flex items-center justify-between gap-3 border-t border-orbit/60 pt-4 text-sm">{footer}</div>
+        <div className={styles.footer}>{footer}</div>
 
         {total > 1 && (
-          <div className="mt-4 flex items-center justify-between">
+          <div className={styles.pager}>
             <button
               type="button"
               onClick={() => onStep(-1)}
-              className="rounded-full border border-orbit px-3.5 py-1.5 text-sm text-muted transition-colors hover:border-brass hover:text-star"
+              className={styles.pageButton}
             >
               ← Prev
             </button>
-            <span className="text-xs text-muted">
+            <span className={styles.count}>
               {position} / {total}
             </span>
             <button
               type="button"
               onClick={() => onStep(1)}
-              className="rounded-full border border-orbit px-3.5 py-1.5 text-sm text-muted transition-colors hover:border-brass hover:text-star"
+              className={styles.pageButton}
             >
               Next →
             </button>

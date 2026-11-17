@@ -1,0 +1,108 @@
+.header {
+  position: fixed;
+  inset-inline: 0;
+  top: 0;
+  z-index: 40;
+  border-bottom: 1px solid transparent;
+  transition-property: background-color, border-color, box-shadow, backdrop-filter;
+  transition-duration: var(--duration-hover);
+  transition-timing-function: var(--ease-out);
+}
+
+/* Once the page scrolls, the header becomes a frosted bar so content never shows through it. */
+.scrolled {
+  background: color-mix(in oklab, var(--color-void) 82%, transparent);
+  border-bottom-color: var(--color-line);
+  box-shadow: 0 8px 24px -16px rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+}
+
+.nav {
+  margin-inline: auto;
+  display: flex;
+  max-width: var(--container);
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem var(--gutter);
+  transition: padding var(--duration-hover) var(--ease-out);
+}
+.scrolled .nav {
+  padding-block: 0.75rem;
+}
+
+.brand {
+  font-family: var(--font-display);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0.025em;
+  color: var(--color-star);
+}
+
+.brandDot {
+  margin-right: 0.5rem;
+  display: inline-block;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: var(--radius-full);
+  background: var(--color-brass);
+  vertical-align: middle;
+  box-shadow: 0 0 14px var(--color-brass);
+}
+
+/* frosted pill shared by the desktop menu and the mobile CTA */
+.pill {
+  border-radius: var(--radius-full);
+  border: 1px solid color-mix(in oklab, var(--color-orbit) 70%, transparent);
+  background: color-mix(in oklab, var(--color-void) 60%, transparent);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.links {
+  composes: pill;
+  display: none;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  transition-property: background-color, border-color;
+  transition-duration: var(--duration-hover);
+  transition-timing-function: var(--ease-out);
+}
+/* the bar itself is frosted now, so the pill would just be a box inside a box */
+.scrolled .links {
+  border-color: transparent;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.link {
+  display: block;
+  border-radius: var(--radius-full);
+  padding: 0.25rem 0.75rem;
+  color: var(--color-muted);
+  transition: color var(--duration-fast) var(--ease);
+}
+@media (hover: hover) {
+  .link:hover {
+    color: var(--color-star);
+  }
+}
+
+.mobileCta {
+  composes: pill;
+  padding: 0.375rem 1rem;
+  color: var(--color-star);
+}
+
+@media (min-width: 40rem) {
+  .links {
+    display: flex;
+  }
+  .mobileCta {
+    display: none;
+  }
+}

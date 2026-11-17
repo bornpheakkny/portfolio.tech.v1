@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SKILL_CATEGORIES, type Skill } from "@/shared";
 import { CorePanel, PlanetPanel, type ExperienceRef, type ProjectRef } from "./PlanetPanel";
+import styles from "./SolarSystem.module.css";
 
 /**
  * Full-page animated orrery. You are the sun; every skill is a planet,
@@ -181,6 +182,18 @@ export function SolarSystem({ skills, projects = [], experience = [] }: Props) {
     const sunHit = sunEl?.querySelector<HTMLElement>("[data-hit]") ?? null;
     const sunState = { op: -1, on: false };
 
+    // ---------- hover easing (0 = idle, 1 = fully hovered), eased every frame ----------
+    const hoverAmt = new Float32Array(planets.length);
+    let sunHoverAmt = 0;
+    function easeHover(dt: number) {
+      const k = reduceMotion ? 1 : 1 - Math.exp(-dt * 10); // ~250ms to settle
+      for (let i = 0; i < hoverAmt.length; i++) {
+        const target = hoverRef.current === i ? 1 : 0;
+        hoverAmt[i]! += (target - hoverAmt[i]!) * k;
+      }
+      sunHoverAmt += ((hoverRef.current === SUN ? 1 : 0) - sunHoverAmt) * k;
+    }
+
     // ---------- sprites that never change ----------
     const corona = makeCorona();
     const rays = makeRays();
@@ -291,10 +304,12 @@ export function SolarSystem({ skills, projects = [], experience = [] }: Props) {
 
     type Placed = { i: number; p: Planet; a: number; x: number; y: number; r: number; front: number };
 
-    /** Marker around the selected (solid, pulsing) or hovered (dashed) planet. */
-    function drawMarker(o: Placed, alpha: number, selectedNow: boolean) {
-      const pr = o.r + 5 + (selectedNow ? Math.sin(sim * 3) * 1.2 : 0);
-      ctx.globalAlpha = alpha * (selectedNow ? 0.9 : 0.55);
+    /** Marker around the selected (solid, pulsing) or hovered (dashed, eased in by `t`) planet. */
+    function drawMarker(o: Placed, alpha: number, selectedNow: boolean, t = 1) {
+      if (t < 0.01) return;
+      // hover ring contracts onto the planet as it fades in
+      const pr = o.r + 5 + (selectedNow ? Math.sin(sim * 3) * 1.2 : (1 - t) * 7);
+      ctx.globalAlpha = alpha * (selectedNow ? 0.9 : 0.55 * t);
       ctx.strokeStyle = "rgb(227, 184, 102)";
       ctx.lineWidth = 1.5;
       if (!selectedNow) ctx.setLineDash([3, 3]);
@@ -352,7 +367,7 @@ export function SolarSystem({ skills, projects = [], experience = [] }: Props) {
 
       // soft glow around the planet
       ctx.globalCompositeOperation = "lighter";
-      ctx.globalAlpha = alpha * (0.55 - 0.3 * o.front);
+      ctx.globalAlpha = Math.min(1, alpha * (0.55 - 0.3 * o.front + 0.35 * (hoverAmt[o.i] ?? 0)));
       ctx.drawImage(p.halo, x - r * 2.6, y - r * 2.6, r * 5.2, r * 5.2);
       ctx.globalCompositeOperation = "source-over";
 
@@ -408,7 +423,7 @@ export function SolarSystem({ skills, projects = [], experience = [] }: Props) {
 
       if (p.ringed) drawRing(o, true, alpha);
       if (o.i === selectedRef.current) drawMarker(o, alpha, true);
-      else if (o.i === hoverRef.current) drawMarker(o, alpha, false);
+      else drawMarker(o, alpha, false, hoverAmt[o.i] ?? 0);
     }
 
     function drawSun(fade: number) {
@@ -448,13 +463,13 @@ export function SolarSystem({ skills, projects = [], experience = [] }: Props) {
 
       // marker when the sun (Core Frontend) is selected or hovered
       const sel = selectedRef.current === SUN;
-      if (sel || hoverRef.current === SUN) {
-        ctx.globalAlpha = fade * (sel ? 0.85 : 0.5);
+      if (sel || sunHoverAmt > 0.01) {
+        ctx.globalAlpha = fade * (sel ? 0.85 : 0.5 * sunHoverAmt);
         ctx.strokeStyle = "rgb(227, 184, 102)";
         ctx.lineWidth = 1.5;
         if (!sel) ctx.setLineDash([4, 4]);
         ctx.beginPath();
-        ctx.arc(cx, cy, sunR + 9 + (sel ? Math.sin(sim * 3) * 1.5 : 0), 0, TAU);
+        ctx.arc(cx, cy, sunR + 9 + (sel ? Math.sin(sim * 3) * 1.5 : (1 - sunHoverAmt) * 10), 0, TAU);
         ctx.stroke();
         ctx.setLineDash([]);
       }
@@ -500,7 +515,9 @@ export function SolarSystem({ skills, projects = [], experience = [] }: Props) {
         const dist = Math.hypot(o.x - cx, o.y - cy);
         const sunVis = o.front < 0.5 ? smooth(L!.sunR * 0.9, L!.sunR * 1.7, dist) : 1;
         let a = scrollVis * tf * depthVis * sunVis;
-        if (o.i === selectedRef.current || o.i === hoverRef.current) a = Math.max(a, scrollVis * tf * sunVis);
+        // hovered / selected labels fade up to full strength instead of popping
+        const focusAmt = o.i === selectedRef.current ? 1 : (hoverAmt[o.i] ?? 0);
+        a += (Math.max(a, scrollVis * tf * sunVis) - a) * focusAmt;
 
         el.style.transform = `translate3d(${o.x.toFixed(2)}px, ${o.y.toFixed(2)}px, 0)`;
         text.style.transform = `translate3d(${(o.r + 8).toFixed(2)}px, -50%, 0)`;
@@ -579,6 +596,7 @@ export function SolarSystem({ skills, projects = [], experience = [] }: Props) {
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = "source-over";
       ctx.clearRect(0, 0, w, h);
+      easeHover(dt);
 
       // star field (deepest layer, smallest parallax)
       if (bg) {
@@ -677,14 +695,14 @@ export function SolarSystem({ skills, projects = [], experience = [] }: Props) {
 
   return (
     <>
-      {/* h-lvh: sized to the *large* viewport so the mobile address bar showing/hiding never resizes it */}
-      <canvas ref={ref} aria-hidden className="pointer-events-none fixed left-0 top-0 -z-10 h-lvh w-full" />
+      {/* sized to the *large* viewport (100lvh) so the mobile address bar never resizes it */}
+      <canvas ref={ref} aria-hidden className={styles.canvas} />
 
       {/* Clickable planet labels. Positioned every frame by the animation loop above. */}
       <nav
         ref={overlayRef}
         aria-label="Technologies — select a planet for details"
-        className="pointer-events-none fixed left-0 top-0 z-[5] h-lvh w-full overflow-hidden"
+        className={styles.overlay}
       >
         {hasSun && (
           <button
@@ -699,18 +717,18 @@ export function SolarSystem({ skills, projects = [], experience = [] }: Props) {
             onFocus={() => setHover(SUN)}
             onBlur={() => hoverRef.current === SUN && setHover(null)}
             style={{ pointerEvents: "none", transform: "translate3d(-200px, -200px, 0)" }}
-            className="group absolute left-0 top-0 size-0 cursor-pointer outline-none will-change-transform"
+            className={styles.body}
           >
             <span
               data-hit
               aria-hidden
-              className="absolute -left-5 -top-5 size-10 rounded-full will-change-transform group-focus-visible:shadow-[0_0_0_2px_#e3b866]"
+              className={styles.hit}
             />
             <span
               data-label
               aria-hidden
               style={{ opacity: 0 }}
-              className="absolute left-0 top-0 whitespace-nowrap text-[11px] font-semibold uppercase leading-none tracking-[0.18em] text-brass will-change-transform [text-shadow:0_1px_2px_rgba(10,13,36,0.95),0_0_12px_rgba(10,13,36,0.9)] group-hover:text-[#f5d595]"
+              className={styles.sunLabel}
             >
               Core Frontend
             </span>
@@ -730,21 +748,19 @@ export function SolarSystem({ skills, projects = [], experience = [] }: Props) {
             onFocus={() => setHover(i)}
             onBlur={() => hoverRef.current === i && setHover(null)}
             style={{ pointerEvents: "none", transform: "translate3d(-200px, -200px, 0)" }}
-            className="group absolute left-0 top-0 size-0 cursor-pointer outline-none will-change-transform"
+            className={styles.body}
           >
             {/* generous hit area centred on the planet */}
             <span
               data-hit
               aria-hidden
-              className="absolute -left-5 -top-5 size-10 rounded-full will-change-transform group-focus-visible:shadow-[0_0_0_2px_#e3b866]"
+              className={styles.hit}
             />
             <span
               data-label
               aria-hidden
               style={{ opacity: 0 }}
-              className={`absolute left-0 top-0 whitespace-nowrap font-medium leading-none text-star transition-colors will-change-transform [text-shadow:0_1px_2px_rgba(10,13,36,0.95),0_0_10px_rgba(10,13,36,0.85)] group-hover:text-brass group-aria-expanded:text-brass ${
-                ring === 0 ? "text-[12.5px]" : "text-[11.5px]"
-              }`}
+              className={`${styles.planetLabel} ${ring === 0 ? styles.inner : styles.outer}`}
             >
               {skill.name}
             </span>

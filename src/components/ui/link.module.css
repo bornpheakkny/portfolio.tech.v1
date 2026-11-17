@@ -1,0 +1,19 @@
+.text {
+  color: var(--color-brass);
+  text-underline-offset: 4px;
+}
+@media (hover: hover) {
+  .text:hover {
+    text-decoration: underline;
+  }
+}
+
+.quiet {
+  color: var(--color-muted);
+  transition: color var(--duration-fast) var(--ease);
+}
+@media (hover: hover) {
+  .quiet:hover {
+    color: var(--color-star);
+  }
+}

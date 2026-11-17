@@ -1,0 +1,59 @@
+/* stacked fields with even spacing; children keep their natural width */
+.form > * + * {
+  margin-top: 1rem;
+}
+
+.row {
+  display: grid;
+  gap: 1rem;
+}
+@media (min-width: 40rem) {
+  .row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.field {
+  display: block;
+}
+
+.label {
+  margin-bottom: 0.375rem;
+  display: block;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: var(--color-muted);
+}
+
+.input {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid var(--color-orbit);
+  background: color-mix(in oklab, var(--color-panel) 70%, transparent);
+  padding: 0.75rem 1rem;
+  color: var(--color-star);
+  outline: none;
+  transition: border-color var(--duration-fast) var(--ease);
+}
+.input::placeholder {
+  color: color-mix(in oklab, var(--color-muted) 70%, transparent);
+}
+.input:focus,
+.input:focus-visible {
+  border-color: var(--color-brass);
+  outline: none;
+}
+
+.error {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: var(--color-error);
+}
+
+.sent {
+  border-radius: 1rem;
+  border: 1px solid color-mix(in oklab, var(--color-brass) 40%, transparent);
+  background: color-mix(in oklab, var(--color-panel) 70%, transparent);
+  padding: 1.5rem;
+  color: var(--color-star);
+}

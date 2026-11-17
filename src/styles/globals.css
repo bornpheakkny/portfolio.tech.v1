@@ -1,0 +1,145 @@
+/*
+ * Global styles: design tokens, a minimal reset and document-level rules only.
+ * Everything component-specific lives in a co-located *.module.css file.
+ */
+
+/* ---------- tokens ---------- */
+:root {
+  /* palette */
+  --color-void: #0a0d24;
+  --color-panel: #12163a;
+  --color-panel-2: #1a1f4a;
+  --color-brass: #e3b866;
+  --color-brass-light: #f0c97c;
+  --color-brass-glow: #f5d595;
+  --color-brass-deep: #b98a3e;
+  --color-star: #ece8dc;
+  --color-muted: #9a9cbc;
+  --color-orbit: #3a3f74;
+  --color-error: #fda4af;
+
+  /* translucent variants */
+  --color-line: color-mix(in oklab, var(--color-orbit) 60%, transparent);
+  --color-star-soft: color-mix(in oklab, var(--color-star) 90%, transparent);
+  --color-star-dim: color-mix(in oklab, var(--color-star) 80%, transparent);
+
+  /* type */
+  --font-display: "Unbounded Variable", "Unbounded", system-ui, sans-serif;
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+
+  /* layout */
+  --container: 72rem;
+  --gutter: 1.5rem;
+  --radius-full: 9999px;
+
+  /* surfaces: content panels sit over the orrery but let it glow through */
+  --surface-panel: color-mix(in oklab, var(--color-void) 78%, transparent);
+  --surface-blur: blur(10px);
+
+  /* motion */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-rise: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --duration-fast: 150ms;
+  --duration-hover: 300ms;
+}
+
+/* ---------- reset ---------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: 0 solid;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  scroll-behavior: smooth;
+  scroll-padding-top: 5rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+ol,
+ul {
+  list-style: none;
+}
+
+img,
+svg,
+video,
+canvas {
+  display: block;
+  vertical-align: middle;
+}
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+a {
+  color: inherit;
+  text-decoration: inherit;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  background: transparent;
+  border-radius: 0;
+}
+button {
+  cursor: pointer;
+}
+textarea {
+  resize: vertical;
+}
+::placeholder {
+  opacity: 1;
+}
+
+/* ---------- document ---------- */
+body {
+  background:
+    radial-gradient(60rem 40rem at 70% 40%, #1b1f55 0%, transparent 60%),
+    radial-gradient(40rem 30rem at 10% 90%, #2a1640 0%, transparent 60%),
+    var(--color-void);
+  background-attachment: fixed;
+  color: var(--color-star);
+  font-family: var(--font-sans);
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-brass);
+  color: var(--color-void);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brass);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
